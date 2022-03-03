@@ -1,5 +1,5 @@
 *****************
-The MuST Project
+About
 *****************
 
 **MuST** is a research project supported by National Science Fundation to build
