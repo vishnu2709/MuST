@@ -1,4 +1,4 @@
-Acknowledgement
+Acknowledgment
 ---------------
 
 The current research efforts in the development of MuST are supported in part by NSF Office
