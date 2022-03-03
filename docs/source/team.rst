@@ -1,3 +1,7 @@
+**********
+MuST Team
+**********
+
 The MuST project is a team effort, requiring to involve dedicated researchers from condensed
 matter physics, high performance computing, computational materials science, applied mathematics
 and software engineering communities. The current participants of the MuST project include
