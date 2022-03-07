@@ -1,8 +1,8 @@
 module SROModule
    use KindParamModule, only : IntKind, RealKind, CmplxKind
-   use MathParamModule, only : ZERO, ONE, CZERO, CONE, SQRTm1, TEN2m6, TEN2m8
-  use ErrorHandlerModule, only : ErrorHandler, WarningHandler
-  use PublicTypeDefinitionsModule, only : NeighborStruct
+   use MathParamModule, only : ZERO, HALF, ONE, TWO, CZERO, CONE, SQRTm1, TEN2m6, TEN2m8
+   use ErrorHandlerModule, only : ErrorHandler, WarningHandler
+   use PublicTypeDefinitionsModule, only : NeighborStruct
 
 !
 public :: initSROMatrix,             &
@@ -16,6 +16,8 @@ public :: initSROMatrix,             &
           assembleTauFromBlocks,     &
           calculateImpurityMatrix,   &
           calSpeciesTauMatrix,       &
+          calNewIJcomponent,         &
+          testConvergence,           &
           calculateSCFSpeciesTerm,   &
           getKauFromTau,             &
           calculateNewTCPA,          &
@@ -62,6 +64,19 @@ private
       complex (kind=CmplxKind), pointer :: kau11(:,:,:) 
    end type SROTMatrixStruct
 !
+!  SCF variables
+!  --------------------------------------------------------------
+   type SCFTMatrixStruct
+      complex (kind=CmplxKind), allocatable :: Tab_inv(:,:,:)
+      complex (kind=CmplxKind), allocatable :: real_tauab(:,:,:)
+   end type SCFTMatrixStruct
+
+   type GammaScfMatrices
+       complex (kind=CmplxKind), allocatable :: gamma_1(:,:)
+       complex (kind=CmplxKind), allocatable :: gamma_2(:,:)
+       complex (kind=CmplxKind), allocatable :: gamma_3(:,:)
+   end type GammaScfMatrices
+!  --------------------------------------------------------------
    type SROMediumStruct
       integer (kind=IntKind) :: local_index
       integer (kind=IntKind) :: global_index
@@ -72,6 +87,8 @@ private
       logical :: isCPA
       type(NeighborStruct), pointer :: Neighbor
       type(SROTMatrixStruct), allocatable :: SROTMatrix(:)
+      type(SCFTMatrixStruct), allocatable :: SCFTMatrix(:)
+      type(GammaScfMatrices) :: GammaMat
       complex (kind=CmplxKind), pointer :: Tcpa(:,:)
       complex (kind=CmplxKind), pointer :: Tcpa_inv(:,:)
       complex (kind=CmplxKind), pointer :: T_CPA(:,:)
@@ -81,7 +98,7 @@ private
    end type SROMediumStruct
 !
    type(SROMediumStruct), allocatable :: SROMedium(:)
-   integer (kind=IntKind) :: next_near_option
+   integer (kind=IntKind) :: next_near_option, sro_scf
    logical :: test_CPA = .false.
    logical :: test_pure = .false.
 
@@ -118,6 +135,8 @@ contains
 
 !  --------------------------------------------------------
    next_near_option = isNextNearestSRO()
+!  --------------------------------------------------------
+   sro_scf = isSROSCF()
 !  --------------------------------------------------------
 
    if (next_near_option == 0) then
@@ -177,6 +196,9 @@ contains
       else
          if (.not. allocated(SROMedium(il)%SROTMatrix)) then
             allocate(SROMedium(il)%SROTMatrix(num))
+         endif
+         if (sro_scf == 1) then
+            allocate(SROMedium(il)%SCFTMatrix(num))
          endif
          do i = 1, num
             allocate(SROMedium(il)%SROTMatrix(i)%tmat_s(nSpinCant**2))
@@ -238,13 +260,26 @@ contains
                        SROMedium(il)%blk_size))
                allocate(SROMedium(il)%SROTMatrix(i)%tmat_s(is)%T_inv(SROMedium(il)%blk_size*SROMedium(il)%neigh_size, &
                        SROMedium(il)%blk_size*SROMedium(il)%neigh_size))
-               if (isSROSCF() == 1) then
+               if (sro_scf == 1) then
                   allocate(SROMedium(il)%SROTMatrix(i)%tmat_s(is)%proj_a(SROMedium(il)%blk_size, SROMedium(il)%blk_size))
                   allocate(SROMedium(il)%SROTMatrix(i)%tmat_s(is)%proj_b(SROMedium(il)%blk_size, SROMedium(il)%blk_size))
+
+                  allocate(SROMedium(il)%SCFTMatrix(i)%Tab_inv(num, SROMedium(il)%blk_size*SROMedium(il)%neigh_size, &
+                                    SROMedium(il)%blk_size*SROMedium(il)%neigh_size))
+                  allocate(SROMedium(il)%SCFTMatrix(i)%real_tauab(num, SROMedium(il)%blk_size*SROMedium(il)%neigh_size, &
+                                    SROMedium(il)%blk_size*SROMedium(il)%neigh_size))
                endif
             enddo
 
          enddo
+         if (sro_scf == 1) then
+            allocate(SROMedium(il)%GammaMat%gamma_1(SROMedium(il)%blk_size*SROMedium(il)%neigh_size, &
+            SROMedium(il)%blk_size*SROMedium(il)%neigh_size))
+            allocate(SROMedium(il)%GammaMat%gamma_2(SROMedium(il)%blk_size*SROMedium(il)%neigh_size, &
+            SROMedium(il)%blk_size*SROMedium(il)%neigh_size))
+            allocate(SROMedium(il)%GammaMat%gamma_3(SROMedium(il)%blk_size*SROMedium(il)%neigh_size, &
+            SROMedium(il)%blk_size*SROMedium(il)%neigh_size))
+         endif
          allocate(SROMedium(il)%Tcpa(SROMedium(il)%blk_size, SROMedium(il)%blk_size))
          allocate(SROMedium(il)%Tcpa_inv(SROMedium(il)%blk_size, SROMedium(il)%blk_size))
          allocate(SROMedium(il)%T_CPA(SROMedium(il)%blk_size*SROMedium(il)%neigh_size,  &
@@ -344,6 +379,7 @@ contains
 !  BE CAREFUL WHETHER TO USE LOCAL OR GLOBAL INDEX ANYWHERE
    
    use MatrixInverseModule, only : MtxInv_LU
+
    integer (kind=IntKind), intent(in) :: n, ia
    integer (kind=IntKind) :: ic, is, nsize
    real (kind=RealKind) :: wab, wab_nn
@@ -402,7 +438,7 @@ contains
 
    do is = 1, nSpinCant
       SROMedium(n)%SROTMatrix(ia)%tmat_s(is)%T_inv = CZERO
-   
+
       do iter2 = 1, nsize
          do iter1 = 1, nsize
             SROMedium(n)%SROTMatrix(ia)%tmat_s(is)%T_inv(iter1,iter2) =  &
@@ -457,10 +493,20 @@ contains
                enddo
             enddo
          enddo
-    
+      endif
+
+      if (sro_scf == 1) then
+         SROMedium(n)%SCFTMatrix(ia)%Tab_inv = CZERO
+         do ic = 1, num_species
+            SROMedium(n)%SCFTMatrix(ia)%Tab_inv(ic,1:nsize,1:nsize) = &
+                           SROMedium(n)%SROTMatrix(ia)%tmat_s(is)%tmat_inv
+            do i = 2, delta
+               SROMedium(n)%SCFTMatrix(ia)%Tab_inv(ic,(i-1)*nsize+1:i*nsize &
+                  ,(i-1)*nsize+1:i*nsize) = SROMedium(n)%SROTMatrix(ic)%tmat_s(is)%tmat_inv
+            enddo
+         enddo
       endif
    enddo
- 
 !  call writeMatrix('Big-TA', SROMedium(1)%SROTMatrix(ia)%tmat_s(1)%T_inv, nsize*delta, nsize*delta) 
 
    end subroutine generateBigTAMatrix
@@ -632,9 +678,10 @@ contains
 !   
    integer(kind=IntKind), intent(in) :: n, ic
 !
-   integer(kind=IntKind) :: dsize, nsize, is, ic1
+   integer (kind=IntKind) :: dsize, nsize, is, ic1
+   complex (kind=CmplxKind), allocatable :: tmp(:,:), tmp2(:,:)
 
-   SROMedium(n)%SROTMatrix(ic)%tau_ab = CZERO 
+   SROMedium(n)%SROTMatrix(ic)%tau_ab = CZERO
 
    dsize = SROMedium(n)%blk_size
    nsize = SROMedium(n)%neigh_size
@@ -647,6 +694,16 @@ contains
 
    SROMedium(n)%SROTMatrix(ic)%tau_ab(:, :, 1) = y
 
+   if (sro_scf == 1) then
+      allocate(tmp(dsize*nsize, dsize*nsize), tmp2(dsize*nsize, dsize*nsize))
+      tmp = CZERO
+      do ic1 = 1, SROMedium(n)%num_species
+         tmp2 = CZERO
+         tmp = SROMedium(n)%SCFTMatrix(ic)%Tab_inv(ic1,:,:) - SROMedium(n)%T_CPA_inv
+         call computeAprojB('L', dsize*nsize, SROMedium(n)%tau_cpa(:,:,1), tmp, tmp2)
+         SROMedium(n)%SCFTMatrix(ic)%real_tauab(ic1,:,:) = tmp2
+      enddo
+   endif
 
 !  call writeMatrix('tau_a11', SROMedium(n)%SROTMatrix(ic)%tau_ab(1:dsize, 1:dsize, 1), &
 !                 dsize, dsize, TEN2m8) 
@@ -743,6 +800,148 @@ contains
 !  ===================================================================
 
 !  ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+   subroutine calGammaMatrices(n)
+!  ===================================================================
+   
+   use AtomModule, only : getLocalSpeciesContent
+   use WriteMatrixModule, only : writeMatrix
+   use MatrixInverseModule, only : MtxInv_LU
+   
+   integer (kind=IntKind), intent(in) :: n
+   integer (kind=IntKind) :: ic, ic1, dsize, nsize
+   real (kind=RealKind) :: c_a, w_ab
+   complex (kind=CmplxKind) :: coeff
+   complex (kind=CmplxKind), allocatable :: tmp(:,:), tmp2(:,:), &
+                                                tmp3(:,:), tmp4(:,:)
+
+   dsize = SROMedium(n)%blk_size
+   nsize = SROMedium(n)%neigh_size
+   allocate(tmp(dsize*nsize, dsize*nsize), tmp2(dsize*nsize, dsize*nsize), &
+         tmp3(dsize*nsize, dsize*nsize), tmp4(dsize*nsize, dsize*nsize))
+   tmp = CZERO; tmp2 = CZERO; tmp3 = CZERO; tmp4 = CZERO
+   SROMedium(n)%GammaMat%gamma_1 = CZERO
+   SROMedium(n)%GammaMat%gamma_2 = CZERO
+   SROMedium(n)%GammaMat%gamma_3 = CZERO
+   coeff = CZERO
+
+   do ic = 1, SROMedium(n)%num_species
+      c_a = getLocalSpeciesContent(n, ic)
+      do ic1 = 1, SROMedium(n)%num_species
+         w_ab = getSROParam(n, ic, ic1)
+         coeff = c_a*w_ab
+!        --------------------------------------------
+!        gamma_2 = sum_{ab} c_a c_b w_ab T^{-1}_{ab} 
+!        --------------------------------------------
+         tmp = SROMedium(n)%SCFTMatrix(ic)%Tab_inv(ic1,:,:)
+         call zaxpy(dsize*nsize*dsize*nsize, coeff, tmp, 1, SROMedium(n)%GammaMat%gamma_2, 1)
+   !     call writeMatrix('Tab_inv', tmp, dsize*nsize, dsize*nsize)
+   !     call writeMatrix('gamma_sum', SROMedium(n)%GammaMat%gamma_2, dsize*nsize, dsize*nsize)
+!        -----------------------------------------------
+!        gamma_1 = sum_{ab} c_a w_ab T^{-1}_{ab}tau_{ab}
+!        -----------------------------------------------
+         tmp2 = SROMedium(n)%SCFTMatrix(ic)%real_tauab(ic1,:,:)
+         call zgemm('n', 'n', dsize*nsize, dsize*nsize, dsize*nsize, CONE, tmp, &
+            dsize*nsize, tmp2, dsize*nsize, CZERO, tmp3, dsize*nsize)
+         call zaxpy(dsize*nsize*dsize*nsize, coeff, tmp3, 1, SROMedium(n)%GammaMat%gamma_1, 1)
+!        ------------------------------------------------------------
+!        gamma_3 = sum_{ab} c_a w_ab T^{-1}_{ab}tau_{ab}T^{-1}_{ab}  
+!        ------------------------------------------------------------
+         call zgemm('n', 'n', dsize*nsize, dsize*nsize, dsize*nsize, CONE, tmp3, &
+            dsize*nsize, tmp, dsize*nsize, CZERO, tmp4, dsize*nsize)
+         call zaxpy(dsize*nsize*dsize*nsize, coeff, tmp4, 1, SROMedium(n)%GammaMat%gamma_3, 1)
+      enddo
+   enddo
+
+   !call writeMatrix('gamma_2', SROMedium(n)%GammaMat%gamma_2, dsize*nsize, dsize*nsize)
+   !call writeMatrix('gamma_1', SROMedium(n)%GammaMat%gamma_1, dsize*nsize, dsize*nsize)
+   !call writeMatrix('gamma_3', SROMedium(n)%GammaMat%gamma_3, dsize*nsize, dsize*nsize)
+
+   end subroutine calGammaMatrices
+!  ===================================================================
+
+!  ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+   function calNewIJcomponent(n, i_row, j_col)  result(final_mat)
+!  ===================================================================
+
+   use MatrixInverseModule, only: MtxInv_LU
+   use WriteMatrixModule, only : writeMatrix
+
+   integer (kind=IntKind), intent(in) :: n, i_row, j_col
+   complex (kind=CmplxKind), allocatable :: gamma_ij(:,:), &
+                  gamma2_ij(:,:), gamma3_ij(:,:), cpa_term(:,:)
+   complex (kind=CmplxKind) :: new_mat(kmax_kkr_max,kmax_kkr_max), &
+                           final_mat(kmax_kkr_max, kmax_kkr_max)
+
+   allocate(gamma_ij(SROMedium(n)%blk_size, SROMedium(n)%blk_size))
+   allocate(gamma2_ij(SROMedium(n)%blk_size, SROMedium(n)%blk_size))
+   allocate(gamma3_ij(SROMedium(n)%blk_size, SROMedium(n)%blk_size))
+   allocate(cpa_term(SROMedium(n)%blk_size, SROMedium(n)%blk_size))
+
+   gamma_ij = SROMedium(n)%GammaMat%gamma_1((i_row-1)*SROMedium(n)%blk_size + 1:i_row*SROMedium(n)%blk_size, &
+               (j_col-1)*SROMedium(n)%blk_size + 1:j_col*SROMedium(n)%blk_size)
+   gamma2_ij = SROMedium(n)%GammaMat%gamma_2((i_row-1)*SROMedium(n)%blk_size + 1:i_row*SROMedium(n)%blk_size, &
+               (j_col-1)*SROMedium(n)%blk_size + 1:j_col*SROMedium(n)%blk_size)
+   gamma3_ij = SROMedium(n)%GammaMat%gamma_3((i_row-1)*SROMedium(n)%blk_size + 1:i_row*SROMedium(n)%blk_size, &
+               (j_col-1)*SROMedium(n)%blk_size + 1:j_col*SROMedium(n)%blk_size)
+
+   call MtxInv_LU(gamma_ij, SROMedium(n)%blk_size)
+! call writeMatrix('gamma_ij', gamma_ij, SROMedium(n)%blk_size, SROMedium(n)%blk_size)
+
+   if (i_row == j_col) then
+      cpa_term = SROMedium(n)%Tcpa_inv
+   else
+      cpa_term = CZERO
+   endif
+   new_mat = CZERO
+
+   call zaxpy(SROMedium(n)%blk_size * SROMedium(n)%blk_size, -CONE, gamma2_ij, 1, new_mat, 1)
+   call zaxpy(SROMedium(n)%blk_size * SROMedium(n)%blk_size, CONE, gamma3_ij, 1, new_mat, 1)
+   call zaxpy(SROMedium(n)%blk_size * SROMedium(n)%blk_size, CONE, cpa_term, 1, new_mat, 1)
+   call zgemm('n', 'n', kmax_kkr_max, kmax_kkr_max, kmax_kkr_max, CONE, gamma_ij, &
+      kmax_kkr_max, new_mat, kmax_kkr_max, CZERO, final_mat, kmax_kkr_max)
+
+   end function calNewIJcomponent
+!  ===================================================================
+
+!  ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+   subroutine testConvergence(n)
+!  ===================================================================
+
+   use AtomModule, only : getLocalSpeciesContent
+   use MatrixModule, only : computeAprojB
+   use WriteMatrixModule, only : writeMatrix
+
+   integer (kind=IntKind), intent(in) :: n
+   integer (kind=IntKind) :: dsize, nsize, ic, ic1
+   real (kind=RealKind) :: c_a, w_ab
+   complex (kind=CmplxKind) :: coeff
+   complex (kind=CmplxKind), allocatable :: xmat(:,:), tmp(:,:), &
+                                         Dmat(:,:), Tdiff(:,:)
+
+   coeff = CZERO
+   dsize = SROMedium(n)%blk_size
+   nsize = SROMedium(n)%neigh_size
+   allocate(xmat(dsize*nsize, dsize*nsize), Dmat(dsize*nsize, dsize*nsize), &
+          Tdiff(dsize*nsize, dsize*nsize), tmp(dsize*nsize, dsize*nsize))
+   xmat = CZERO; Dmat = CZERO; Tdiff = CZERO; tmp = CZERO
+
+   do ic = 1, SROMedium(n)%num_species
+      c_a = getLocalSpeciesContent(n, ic)
+      do ic1 = 1, SROMedium(n)%num_species
+         w_ab = getSROParam(n, ic, ic1)
+         coeff = c_a*w_ab
+         Tdiff = SROMedium(n)%SCFTMatrix(ic)%Tab_inv(ic1,:,:) - SROMedium(n)%T_CPA_inv
+         call computeAprojB('L', dsize*nsize, Tdiff, SROMedium(n)%tau_cpa(:,:,1), tmp)
+         call zaxpy(dsize*nsize*dsize*nsize, coeff, tmp, 1, xmat, 1)
+      enddo 
+   enddo
+
+   call writeMatrix('xmat', xmat, dsize*nsize, dsize*nsize)
+   
+   end subroutine testConvergence
+!  ===================================================================
+
+!  ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
    subroutine calSpeciesTauMatrix()
 !  ===================================================================
 !  -------------------------------------------------------------------
@@ -754,7 +953,7 @@ contains
    use WriteMatrixModule, only : writeMatrix
    use SSSolverModule, only : getScatteringMatrix
 !
-   integer(kind=IntKind) :: j, is, ic, dsize, nsize
+   integer(kind=IntKind) :: j, is, ic, ic1, dsize, nsize
 
    dsize = SROMedium(1)%blk_size
    nsize = SROMedium(1)%neigh_size
@@ -784,6 +983,9 @@ contains
        call calculateImpurityMatrix(j, ic)
 !      -------------------------------------------
      enddo
+     if (sro_scf == 1) then
+       call calGammaMatrices(j)
+     endif 
    enddo
 
 !  if (isSROSCF() == 0) then

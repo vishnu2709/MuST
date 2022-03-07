@@ -363,7 +363,8 @@ contains
    use AccelerateCPAModule, only : setAccelerationParam, getAccelerationType
 !
    use EmbeddedClusterModule, only : setupHostMedium, getTau
-   use SROModule, only : calSpeciesTauMatrix, calculateSCFSpeciesTerm, calculateNewTCPA
+   use SROModule, only : calSpeciesTauMatrix, calculateSCFSpeciesTerm, &
+       calculateNewTCPA, getNeighSize, calNewIJcomponent, testConvergence
 !
    use WriteMatrixModule,  only : writeMatrix
 !
@@ -378,7 +379,7 @@ contains
    logical :: used_Anderson, used_Broyden, used_AndersonOld
 !
    integer (kind=IntKind) :: ia, id, nsize, n, dsize, mixing_type
-   integer (kind=IntKind) :: ns, is, js, switch, nt
+   integer (kind=IntKind) :: ns, is, js, switch, nt, i, j, neigh_size
    integer (kind=IntKind) :: site_config(LocalNumSites)
 !
    logical :: use_sro
@@ -649,15 +650,16 @@ contains
 !        ==========================================================
 !        Calculate Block Tau_CPA, Block TCPA and Ta matrices
 !        ==========================================================
-         call calCrystalMatrix(e,getSingleSiteTmat,use_tmat=.true.,   &
-                  tau_needed=.true.,use_sro=use_sro)
+!        call calCrystalMatrix(e,getSingleSiteTmat,use_tmat=.true.,   &
+!                 tau_needed=.true.,use_sro=use_sro)
 !        ----------------------------------------------------------
-         call retrieveTauSRO()
+!        call retrieveTauSRO()
 !        ----------------------------------------------------------
-         call populateBigTCPA()
-         call calSpeciesTauMatrix()
+!        call populateBigTCPA()
+!        call calSpeciesTauMatrix()
 !        ----------------------------------------------------------
          do n = 1, LocalNumSites
+           neigh_size = getNeighSize(n)
            if (isCPAMedium(n)) then
                dsize = CPAMedium(n)%dsize
                nsize = dsize*nSpinCant
@@ -669,18 +671,38 @@ contains
 !              ==========================================================
 !              Calculate for projection matrix for each species 
 !              ==========================================================
-               do ia = 1, CPAMedium(n)%num_species
+      !        do ia = 1, CPAMedium(n)%num_species
+!     !           ----------------------------------------------------------
+      !           call calculateSCFSpeciesTerm(n, ia, CPAMedium(n)%CPAMatrix(ia)%content)
 !                 ----------------------------------------------------------
-                  call calculateSCFSpeciesTerm(n, ia, CPAMedium(n)%CPAMatrix(ia)%content)
-!                 ----------------------------------------------------------
+      !        enddo
+               do i = 1, neigh_size
+                  do j = 1, neigh_size
+               !     ----------------------------------------------------------
+                     call calCrystalMatrix(e,getSingleSiteTmat,use_tmat=.true.,   &
+                     tau_needed=.true.,use_sro=use_sro)
+   !                 ----------------------------------------------------------
+                     call retrieveTauSRO()
+   !                 ----------------------------------------------------------
+                     call populateBigTCPA()
+                     call calSpeciesTauMatrix()
+!                    ----------------------------------------------------------
+                     t_proj = calNewIJcomponent(n, i, j)
+                     CPAMedium(n)%TcpaInv = t_proj
+                     CPAMedium(n)%Tcpa = CPAMedium(n)%TcpaInv
+               !     ----------------------------------------------------------
+                     call MtxInv_LU(CPAMedium(n)%Tcpa,nsize)
+!                    ----------------------------------------------------------
+                  enddo 
                enddo
-               t_proj = calculateNewTCPA(n)
-               CPAMedium(n)%TcpaInv = CPAMedium(n)%TcpaInv + t_proj
-               CPAMedium(n)%Tcpa = CPAMedium(n)%TcpaInv
+   !           t_proj = calculateNewTCPA(n)
+   !           CPAMedium(n)%TcpaInv = CPAMedium(n)%TcpaInv + t_proj
+!              CPAMedium(n)%Tcpa = CPAMedium(n)%TcpaInv
 !              ----------------------------------------------------------
-               call MtxInv_LU(CPAMedium(n)%Tcpa,nsize)
+!              call MtxInv_LU(CPAMedium(n)%Tcpa,nsize)
 !              ----------------------------------------------------------
                call checkCPAMedium(n,err)
+               call testConvergence(n)
 !              ----------------------------------------------------------
                if (print_instruction >= 0) then
                   write(6,'(a,2i4,2x,d15.8)')' SRO Iteration, medium, err = ', &
