@@ -7,7 +7,7 @@ Contents
 .. toctree::
 
    about
-   usage
    installation
+   usage
    acknowledgment
    team
