@@ -8,7 +8,10 @@ MuST uses make to compile the package and create executables. You have an option
 Full Installation (Recommended)
 ++++++++++++++++++
 
-Instead of passing all the required parameters to make, MuST uses a simple "architecture file", which contains all the information (like compilers, library paths) that make requires. Several architecture files are available in the architecture folder. Here is an example file for osx system using gnu compilers and openmpi::
+Instead of passing all the required parameters to make, MuST uses a simple "architecture file", which contains all the information (like compilers, library paths) that make requires. Several architecture files are available in the architecture folder. Here is an example file for osx system using gnu compilers and openmpi
+
+.. parsed-literal::
+
   #=====================================================================
   # Acceleration = 1: enable GPU acceleration
   # Acceleration = 0: otherwise
@@ -84,10 +87,12 @@ As you can see, the file contains information that would normally be passed to m
  
 2. In the top directory (MuST/), run the following command to build executables::
 
+.. parsed-literal::
   make architecture-file-name (e.g., make linux-intel-nogpu)
 
 3. To copy all executables into a single bin folder, run::
 
+.. parsed-literal::
   make install
   
 Note --
