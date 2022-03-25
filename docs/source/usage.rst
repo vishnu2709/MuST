@@ -2,9 +2,6 @@
 Usage
 *****
 
-Executables under bin/:
-#######################
-
 1. mst:
 The corresponding main source code is MST/src/mst2.F90. It performs ab
 initio electronic structure calculations for 3-d structures.
