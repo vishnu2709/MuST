@@ -8,7 +8,7 @@ MuST uses make to compile the package and create executables. You have an option
 Full Installation (Recommended)
 ++++++++++++++++++
 
-Instead of passing all the required parameters to make, MuST uses a simple "architecture file", which contains all the information (like compilers, library paths) that make requires. Several architecture files are available in the architecture folder. Here is an example file for osx system using gnu compilers and openmpi
+Instead of passing all the required parameters to make, MuST uses a simple "architecture file", which contains all the information (like compilers, library paths) that make requires. Several architecture files are available in the architecture folder. Here is an example file for osx system using gnu compilers and openmpi (osx-gnu-openmpi)
 
 .. parsed-literal::
 
@@ -82,13 +82,12 @@ As you can see, the file contains information that would normally be passed to m
 
 1. Identify the architecture file most suited to your system. Carefully look through this file and see if any specific changes are needed in order to make it run for your system
 
-  * NOTE: If you are running this on Summit, Cori, Bridges (Bridges-2), Crusher, Ascent, Frontera or ThetaGPU, you can directly use the corresponding    
-  architecture file provided.
+  * NOTE: If you are running this on Summit, Cori, Bridges (Bridges-2), Crusher, Ascent, Frontera or ThetaGPU, you can directly use the corresponding architecture file provided.
  
 2. In the top directory (MuST/), run the following command to build executables::
 
 .. parsed-literal::
-  make architecture-file-name (e.g., make linux-intel-nogpu)
+  make architecture-file-name (e.g., make osx-gnu-openmpi)
 
 3. To copy all executables into a single bin folder, run::
 
@@ -130,4 +129,5 @@ Unfortunately, the latest Fedora Linux system does not place the library in conv
 before installing MuST or MST, please make sure that /usr/include/tirpc and /usr/include/tirpc/rpc exist. If not,
 you need to ask your system administrator to istall libtirpc and librirpc-devel for you, or to run the following command
 if you have the sys-admin privilige:
+.. parsed-literal::
    sudo dnf install libtirpc libtirpc-devel
