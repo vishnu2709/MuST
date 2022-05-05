@@ -2,7 +2,9 @@
 Usage
 *****
 
-1. mst:
+====
+mst
+====
 The corresponding main source code is MST/src/mst2.F90. It performs ab
 initio electronic structure calculations for 3-d structures.
 Main features:
@@ -41,7 +43,10 @@ Example input files for various structures can be found under MST/sample/.
 Note: Unless otherwise changed name in archiecture file, the executable name is called
 "mst2" by default.
 
-2. lsms
+====
+lsms
+====
+
 The corresponding main source code is lsms/src/Main/lsms.cpp. It performs ab
 initio, linear scaling, electronic structure calculations for 3-d structures.
 Main features:
@@ -54,7 +59,10 @@ Execution:
    mpirun -np number_of_CPU_cores $(MuST_PATH)/bin/lsms < i_file
 Example input files for various structures can be found under lsms/Test/.
 
-3. kubo
+====
+kubo
+====
+
 The electrical conductivity of random alloys can be calculated using kubo. To do so, first:
     * Perform a KKR-CPA calculation on the random system and obtain the converged potential
     * Now prepare the input file for kubo. Examples of kubo input files are available in Tutorials/CuZn/KUBO and Tutorials/AlCoCrFeNi/KUBO
@@ -62,7 +70,12 @@ Once that is done, the conductivity calculation can be started with:
     mpirun -np number_of_CPU_cores $(MuST_PATH)/bin/kubo < i_file
 The o_file will contain the resistivity, expressed in muOhm-cm
 
-4. wl-lsms
+Note that kubo is only tested for single sublattice CPA calculations (with one atom per unit cell). Please ensure that the primitive cell is being used. While the code may work and provide sensible results for multi-sublattice structures, it has not been properly tested.
+
+====
+wl-lsms
+====
+
 The corresponding main source code is lsms/src/Main/wl_lsms.cpp. It performs
 Wang-Landau Monte-Carlo simulation of random unit cell samples with energy data
 obtained from LSMS electronic structure calculation.
@@ -74,21 +87,30 @@ Execution:
    mpirun -np number_of_CPU_cores $(MuST_PATH)/bin/wl-lsms < i_file
 Example input files for various structures can be found under lsms/Test/.
 
-4. genap:
+====
+genap:
+====
+
 A utility code (main: MST/util/generateAtomPosition.F90) for generating unit cell sample of
 ordered compounds or disordered alloys (with random distribution or short-range order)
 Execution:
    $(MuST_PATH)/bin/genap
 The input data can be taken at the prompt on computer screen.
 
-5. measureVoronoi
+====
+measureVoronoi
+====
+
 A utility code (main: MST/util/measureVoronoi.F90) for determining the geometric properties of
 voronoi polyhedra generated for each atom in a unit cell sample.
 Execution:
    mpirun -np number_of_CPU_cores $(MuST_PATH)/bin/measureVoronoi < i_file
 Note, the input file, i_file, is the same as the one used for running bin/mst2.
 
-6. murn
+====
+murn
+====
+
 A utility code (main: MST/util/murn_new.F90) for determining the ground state properties
 (lattice constant, unit cell volume, and bulk modulus) of a structure with given data for
  energy versus volume (or lattice constant).
@@ -96,7 +118,10 @@ Execution:
    $(MuST_PATH)/bin/murn < input_file
 An example input file for murn, inp_murn, can be found under MST/sample/Co/a0/.
 
-7. newa:
+====
+newa
+====
+
 A utility code (main: MST/util/newa.F) for generating an initial atomic potential
 Input file:
 !   _a_in: input file specifying the atom type, spin information, output file name, etc
@@ -108,7 +133,10 @@ Execution:
 An example input file for newa, Mg_a_in, for generating Mg atom potential can be found under
 MST/sample/Mg/Atom/.
 
-8. newss:
+====
+newss
+====
+
 A utility code (main: MST/util/newss.F) for generating an initial potential for the KKR/KKR-CPA/LSMS
 based electronic structure calculations.
 Input files:
