@@ -54,7 +54,15 @@ Execution:
    mpirun -np number_of_CPU_cores $(MuST_PATH)/bin/lsms < i_file
 Example input files for various structures can be found under lsms/Test/.
 
-3. wl-lsms
+3. kubo
+The electrical conductivity of random alloys can be calculated using kubo. To do so, first:
+    * Perform a KKR-CPA calculation on the random system and obtain the converged potential
+    * Now prepare the input file for kubo. Examples of kubo input files are available in Tutorials/CuZn/KUBO and Tutorials/AlCoCrFeNi/KUBO
+Once that is done, the conductivity calculation can be started with:
+    mpirun -np number_of_CPU_cores $(MuST_PATH)/bin/kubo < i_file
+The o_file will contain the resistivity, expressed in muOhm-cm
+
+4. wl-lsms
 The corresponding main source code is lsms/src/Main/wl_lsms.cpp. It performs
 Wang-Landau Monte-Carlo simulation of random unit cell samples with energy data
 obtained from LSMS electronic structure calculation.
